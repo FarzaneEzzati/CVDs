@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 '''Dataset Import'''
-csv_data = pd.read_csv("..\\Data\\Data 01\\Data Combined.csv")
+csv_data = pd.read_csv("..\\Data\\Data 01\\Data_Combined.csv")
 ### name of columns
 ### From ==>  ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol', 'fasting blood sugar', 'resting ecg',
 ###            'max heart rate', 'exercise angina', 'oldpeak', 'ST slope', 'target']
