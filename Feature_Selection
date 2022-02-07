@@ -1,0 +1,143 @@
+############################################## IMPORTING LIBRARIES ##################################################
+import pandas as pd
+import numpy as np
+from skrebate import ReliefF
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+
+
+
+Data = pd.read_csv('..\\Data\\Data 01\\Data Standardized.csv')
+drop = ['Unnamed: 0', 'recg 0', 'ST 2', 'tgt']
+features, labels = Data.drop(drop, axis=1).values, Data['tgt'].values
+legend = Data.columns.drop(drop)
+
+
+features_num = len(Data.columns)-len(drop) # the first one is index and the second is target
+
+X_train, X_test, y_train, y_test = train_test_split(features, labels, random_state=100, train_size=.8)
+
+############################################## MY COLOUR PALETTE ##################################################
+colours = pd.read_csv('..\\Data\\Data 01\\My colours.csv')
+colours = list(colours.columns)
+
+############################################## RELIEFF FUNCTION ##################################################
+def Relief(test):
+    print('Relief Started')
+    start = 50; stop = 800; points = 11
+    neighbors = np.linspace(start, stop, points)
+    features_to_select = [5]
+    if test == '0':
+        for feat in features_to_select:
+            scores = np.zeros((points, features_num))
+            for neighbor in range(points):
+                ### ==> Training
+                fs = ReliefF(n_features_to_select=feat, n_neighbors=int(neighbors[neighbor])); print(int(neighbors[neighbor]))
+                fs.fit(X_train, y_train)
+                scores[neighbor,:] = fs.feature_importances_
+            features_score_per_neighbor = pd.DataFrame(scores, columns=legend)
+            features_score_per_neighbor.to_csv('..\\Data\\Data 01\\Relief Scores All Neighbors Training.csv')
+
+            ### ==> Testing
+            fs = ReliefF(n_features_to_select=feat, n_neighbors=stop)
+            fs.fit(X_train,y_train)
+            fs.fit_transform(X_test, y_test)
+            test_scores = []
+            for feature_name, feature_score in zip(Data.drop('tgt', axis=1).columns, fs.feature_importances_):
+                test_scores.append(feature_score)
+            test_scores = pd.DataFrame(test_scores, columns=['feature','score'])
+            test_scores.to_csv('..\\Data\\Data 01\\Relief Scores All Neighbors Testing - Not Used.csv')
+
+            fig = plt.figure(dpi= 150)
+            axs = fig.add_axes([0,0,1,1])
+            for c in range(features_num):
+                axs.plot(neighbors, scores[:,c], c=colours[c])
+            axs.set_xlabel('Neighbors')
+            axs.set_ylabel('Scores (Weights)')
+            axs.set_title('ReliefF : selected features=' + str(feat) + ', neighbors=' + str(start) + str(':') + str(stop) + str(':') + str(points))
+            axs.legend( legend, loc=[1.05,0])
+            fig.savefig('..\\Figures\\Relief All Neighbors.png', bbox_inches='tight')
+    else:
+        fs = ReliefF(n_features_to_select=5, n_neighbors=400)
+        fs.fit(X_train,y_train)
+        fs.fit_transform(X_test,y_test)
+        test_scores = []
+        for feature_name, feature_score in zip(Data.drop(drop, axis=1).columns, fs.feature_importances_):
+            test_scores.append([feature_name,feature_score])
+        test_scores = pd.DataFrame(test_scores, columns=['feature', 'score'])
+        test_scores.to_csv('..\\Data\\Data 01\\Relief Scores All Neighbors Testing.csv')
+    return print("Relief Feature Selection Done")
+############################################## INFO GAIN FUNCTION ##################################################
+def Info_Gain():
+    print('Info Gain Started')
+    from sklearn.feature_selection._mutual_info import mutual_info_classif
+    start = 250;  stop = 800; points = 30
+    neighbors = np.linspace(start, stop, points)
+    IG_score_per_neighbor = np.zeros((points, features_num)) # Numpy Array
+    for neighbor in range(points):
+        IG = mutual_info_classif(features, labels, discrete_features='auto', n_neighbors=int(neighbors[neighbor]), copy=True, random_state=None  )
+        IG_score_per_neighbor[neighbor,:] = IG
+
+    IG_score_per_neighbor_dataframe = pd.DataFrame(IG_score_per_neighbor, columns=legend)
+    IG_score_per_neighbor_dataframe.to_csv('..\\Data\\Data 01\\Info-Gain Scores.csv')
+    fig = plt.figure(dpi=150)
+    axs = fig.add_axes([0, 0, 1, 1])
+    for c in range(features_num):
+        axs.plot(neighbors, IG_score_per_neighbor[:,c], c=colours[c])
+    axs.set_xlabel('Neighbors')
+    axs.set_ylabel('Scores (Weights)')
+    axs.set_title('Information Gain : neighbors=' + str(start) + str(':') + str(stop) + str(
+        ':') + str(points))
+    axs.legend(legend, loc=[1.05, 0])
+    fig.savefig('..\\Figures\\IG All Neighbors.png', bbox_inches='tight')
+    return print("Info_Gain Feature Selection Done")
+
+############################################ RELIEF SELECTED FEATURES ################################################
+def ReliefSelected():
+    data = pd.read_csv('..\\Data\\Data 01\\Relief Scores All Neighbors Testing.csv')
+
+    removed = np.where(data['score']<=0)
+    legend_index = range(len(legend))
+    selected = ~np.isin(legend_index,removed)
+    Relief_selected_features = legend[selected]
+    print(Relief_selected_features)
+    Relief_features_values = Data[Relief_selected_features]
+    Relief_features_values['tgt'] = Data['tgt']
+    Relief_features_values.to_csv('..\\Data\\Data 01\\Relief Selected Features.csv')
+
+############################################ RELIEF SELECTED FEATURES ################################################
+def IGSelected():
+    data = pd.read_csv('..\\Data\\Data 01\\Info-Gain Scores.csv')
+    what_neighbor = int((430-250)/(800-250)*30)-1
+    selected_neighbor = data.iloc[what_neighbor]>0
+    print('selected neighbor is %s: '% what_neighbor)
+    selected = legend[selected_neighbor[1:]]
+    MI_features_values = Data[selected]
+    MI_features_values['tgt'] = Data['tgt']
+    MI_features_values.to_csv('..\\Data\\Data 01\\MI Selected Features.csv')
+
+############################################## LASSO FUNCTION ##################################################
+def heat_map():
+    fig = plt.figure(figsize=(20,8), dpi=200)
+    sns.heatmap(data.drop('Unnamed: 0', axis=1).corr(), annot=True, cmap='coolwarm')
+    plt.savefig('..\\Figures\\Heat Map.png', bbox_inches='tight')
+############################################## MAIN ##################################################
+if __name__ == '__main__':
+    continue_v = '1'
+    while continue_v == '1':
+        task = '1: Relief Feature Selection \n2: Mutual Information Feature Selection \n3: Relief Selected Features \n4: MI Selected Features' \
+               '\n5: Heatmap'
+        print(task)
+        task_num = input('Please select your task ==> ')
+        if task_num == '1':
+            test = input('You wanna test: 1=yes , 0=no ')
+            Relief(test);
+        elif task_num == '2':
+            Info_Gain();
+        elif task_num == '3':
+            ReliefSelected();
+        elif task_num == '4':
+            IGSelected();
+        else: heat_map();
+        continue_v = input('Do you wanna continue? Yes=1, No=0  ==> '); continue
