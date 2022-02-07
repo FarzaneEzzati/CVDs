@@ -1,0 +1,193 @@
+'''
+This is a program to predict heart disease with sepcific medical conditions.
+The output is descrete (using classification)
+the prediction is based supervised machine learning and conducted algorithms are:
+1. logistic regression
+2. support vector machine
+3. naive bayes
+4. Kmeans
+5. Desicion Trees
+'''
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import roc_auc_score ,roc_curve, recall_score , precision_score, f1_score,confusion_matrix , accuracy_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, BaggingClassifier
+import math
+import random
+import matplotlib.pyplot as plt
+from sklearn import metrics
+import seaborn as sns
+from joblib import dump, load
+
+def EvalSplit(df):                  # Keep a proportion of data for final prediction (evaluation)
+    part_20 = df.sample(frac = 0.2) ## 20% of data is stotred for evaluation
+    rest = df.drop(part_20.index)
+    return rest, part_20
+
+def TrainTestSplit(feature, lables):
+    ### === Train and Test Split === ###
+    X_train, X_test, y_train, y_test = train_test_split(feature, labels, test_size=0.2, shuffle=True)
+    ### === Plot heatmap === ###
+    fig = plt.figure(figsize=(10, 5), dpi=200)
+    sns.heatmap(data.drop(droped, axis=1).corr(), cmap='YlGnBu', annot=True)
+    plt.savefig('..\\Figures\\Heatmap All Features.png', bbox_inches='tight')
+    '''
+    Determines the cross-validation splitting strategy. Possible inputs for cv are:
+    1) None, to use the default 5-fold cross validation,
+    2) int, to specify the number of folds in a (Stratified)KFold,
+    3) CV splitter,
+    4) An iterable that generates (train, test) splits as arrays of indices.
+    '''
+    return X_train, X_test, y_train, y_test
+
+##################################### Finding Optimal Treshold ############################################
+def OptimalTreshold(features, labels, selection_type, data_eval, droped):
+    print("Optimal Threshold Started")
+    ## Initialization
+    n_estimators = 10;  max_iter = 10000; epoches = 20; rand_state = 23
+    
+    ## Random Forest & Decision Tree Models
+    if selection_type == 'MI_Features':
+        rf_model = RandomForestClassifier(n_estimators=500, criterion='entropy')
+        dt_model = DecisionTreeClassifier(criterion='entropy', max_depth=4)
+
+    else:
+        rf_model = RandomForestClassifier(n_estimators=500, criterion='gini')
+        dt_model = DecisionTreeClassifier(criterion='gini', max_depth=4)
+
+    rfb_model = BaggingClassifier(base_estimator=rf_model, random_state=rand_state, n_estimators=3)
+    dtb_model = BaggingClassifier(base_estimator=dt_model, n_estimators=n_estimators, random_state=rand_state)
+
+    ## K_neighbor
+    kn_model = KNeighborsClassifier(weights='distance', metric='minkowski', leaf_size=25)
+    knb_model = BaggingClassifier(base_estimator=KNeighborsClassifier(), n_estimators=n_estimators, random_state=rand_state)
+
+    ## SVMPOLY2
+    svm_model_poly_2 = SVC(kernel='poly', degree=2, coef0=0.01, C=1, max_iter=max_iter, probability=True)
+    svmb_model_poly_2 = BaggingClassifier(base_estimator=svm_model_poly_2, n_estimators=n_estimators, random_state=rand_state)
+
+    ## SVMPOLY3
+    svm_model_poly_3 = SVC(kernel='poly', degree=3, coef0=0.01, C=1, max_iter=max_iter, probability=True)
+    svmb_model_poly_3 = BaggingClassifier(base_estimator=svm_model_poly_3, n_estimators=n_estimators, random_state=rand_state)
+
+    ## Gradient Boosting
+    gb_model = GradientBoostingClassifier(learning_rate=0.9, n_estimators=150, loss='exponential')
+    gbb_model = BaggingClassifier(base_estimator=gb_model, n_estimators=n_estimators, random_state=rand_state)
+
+    ## Naive Bayes
+    nb_model = GaussianNB()
+    nbb_model = BaggingClassifier(base_estimator=GaussianNB(), n_estimators=n_estimators, random_state=rand_state)
+
+    ## Logistic Regression
+    lg_model = LogisticRegression(max_iter=max_iter, random_state=rand_state, penalty='l2')
+    lgb_model = BaggingClassifier(base_estimator=LogisticRegression(), n_estimators=n_estimators, random_state=rand_state)
+
+
+    selected_models = [rf_model,rfb_model,dt_model,dtb_model,kn_model,knb_model,svm_model_poly_2,svmb_model_poly_2,
+                       svm_model_poly_3,svmb_model_poly_3,gb_model,gbb_model,nb_model,nbb_model,lg_model,lgb_model]
+
+    optimal_threshold = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+    metrics = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+    X_train, X_test, y_train, y_test = train_test_split(features, labels, test_size=0.20)
+    
+    for epoch in range(epoches):
+        print(epoch)
+        # === Training Fitting & Finding Optimal treshhold ======
+        for model in range(len(selected_models)):
+            selected_models[model].fit(X_train,y_train)
+            globals()['fpr%s' %model], globals()['tpr%s' %model],globals()['thresholds%s' %model] = roc_curve(y_test, selected_models[model].predict_proba(X_test)[:,1])
+            # === output: fpr0-15, tpr0-15, thresholds0-15
+
+        optimal_threshold[0].append(  thresholds0[np.argmin(abs(fpr0 + tpr0 - 1))] )
+        optimal_threshold[1].append(  thresholds1[np.argmin(abs(fpr1 + tpr1 - 1))] )
+        optimal_threshold[2].append(  thresholds2[np.argmin(abs(fpr2 + tpr2 - 1))] )
+        optimal_threshold[3].append(  thresholds3[np.argmin(abs(fpr3 + tpr3 - 1))] )
+        optimal_threshold[4].append(  thresholds4[np.argmin(abs(fpr4 + tpr4 - 1))] )
+        optimal_threshold[5].append(  thresholds5[np.argmin(abs(fpr5 + tpr5- 1))] )
+        optimal_threshold[6].append(  thresholds6[np.argmin(abs(fpr6 + tpr6 - 1))] )
+        optimal_threshold[7].append(  thresholds7[np.argmin(abs(fpr7 + tpr7 - 1))] )
+        optimal_threshold[8].append(  thresholds8[np.argmin(abs(fpr8 + tpr8 - 1))] )
+        optimal_threshold[9].append(  thresholds9[np.argmin(abs(fpr9 + tpr9 - 1))] )
+        optimal_threshold[10].append( thresholds10[np.argmin(abs(fpr10 + tpr10 - 1))] )
+        optimal_threshold[11].append( thresholds11[np.argmin(abs(fpr11 + tpr11 - 1))] )
+        optimal_threshold[12].append( thresholds12[np.argmin(abs(fpr12 + tpr12 - 1))] )
+        optimal_threshold[13].append( thresholds13[np.argmin(abs(fpr13 + tpr13 - 1))] )
+        optimal_threshold[14].append( thresholds14[np.argmin(abs(fpr14 + tpr14 - 1))] )
+        optimal_threshold[15].append(  thresholds15[np.argmin(abs(fpr15 + tpr15 - 1))] )
+
+
+    # === Set average of thresholds ===
+    optimal_threshold_mean = []
+    for model in range(len(selected_models)):
+        optimal_threshold_mean.append(np.mean(optimal_threshold[model]))
+
+    # === Finall prediction ===
+    X_test , y_test = data_eval.drop(droped, axis=1).values, data_eval['tgt'].values
+
+    for model in range(len(selected_models)):
+        predicted = selected_models[model].predict_proba(X_test)[:,1]>=optimal_threshold_mean[model]
+        metrics[model].append(accuracy_score(y_test, predicted))
+        metrics[model].append(roc_auc_score(y_test, predicted))
+        metrics[model].append(recall_score(y_test, predicted))
+        metrics[model].append(precision_score(y_test, predicted))
+        metrics[model].append(f1_score(y_test, predicted))
+
+    columns = ['Accuracy','ROC_AUC','Recall','Precision','F1']
+    index_label = [ 'Random Forest','Bagging Random Forest','Decision Tree','Bagging Decision Tree','K_neighbor','Bagging K_neighbor',
+                    'SVMPoly2','Bagging SVMPoly2','SVMPoly3','Bagging SVMPoly3','Gradient Boosting','Bagging Gradient Boosting',
+                    'Naive Bayes','Bagging Naive Bayes','Logistic Regression','Bagging Logistic Regression']
+    metrics = pd.DataFrame(metrics,index=index_label, columns=columns)
+    metrics['Optimal Threshold'] = optimal_threshold_mean
+    metrics.to_csv('..\\Data\\Data 01\\Machine_Learning_Finall_Results_'+selection_type+'.csv')
+
+
+    fig, axs = plt.subplots(1,2, figsize=(11,5), dpi=200)
+    axs[0].plot(range(epoches), optimal_threshold[0], '-s', color='blue', label='Random Forest')
+    axs[0].plot(optimal_threshold[1], ':o', color='orange', label='Bagging Random Forest')
+    axs[0].set_xlabel('Epochs')
+    axs[0].set_ylabel('Optimal Threshold')
+    axs[0].legend()
+
+    axs[1].plot(fpr0,tpr0, color='blue', label='Random Forest')
+    axs[1].plot(fpr1,tpr1, color='orange', label='Bagging Random Forest')
+    axs[1].plot([0,1],[0,1], ':', color='blue', label='Baseline')
+    axs[1].set_xlabel('FPR: Specifity')
+    axs[1].set_ylabel('TPR: Sensitivity')
+    axs[1].legend()
+
+    plt.savefig('..\\Figures\\Thresholds_'+selection_type+'.png', bbox_inches='tight')
+
+    print("Optimal Done")
+
+
+############################################## MAIN ##################################################
+if __name__ == '__main__':
+    droped = ['Unnamed: 0', 'tgt']; cont = '1'
+    while cont == '1':
+        predictor = input('<<1>> All Features <<2>> Relief <<3>> Mutual Information: ')
+        if predictor == '1':
+            data = pd.read_csv('..\\Data\\Data 01\\Data Standardized.csv')
+            data_train, data_eval = EvalSplit(data)
+            features, labels = data_train.drop(droped, axis=1).values, data_train['tgt'].values
+            OptimalTreshold(features, labels, 'All_Features', data_eval, droped)
+        elif predictor == '2':
+            data = pd.read_csv('..\\Data\\Data 01\\Relief Selected Features.csv')
+            data_train, data_eval = EvalSplit(data)
+            features, labels = data_train.drop(droped, axis=1).values, data_train['tgt'].values
+            OptimalTreshold(features, labels, 'Relief_Features', data_eval, droped)
+        elif predictor == '3':
+            data = pd.read_csv('..\\Data\\Data 01\\MI Selected Features.csv')
+            data_train, data_eval = EvalSplit(data)
+            features, labels = data_train.drop(droped, axis=1).values, data_train['tgt'].values
+            OptimalTreshold(features, labels, 'MI_Features', data_eval, droped)
+        cont = input('Continue: 1=yes | 0=no '); continue
