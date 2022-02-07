@@ -1,0 +1,74 @@
+'''Importing Libraries'''
+import pandas as pd
+import numpy as np
+
+'''Dataset Import'''
+csv_data = pd.read_csv("..\\Data\\Data 01\\Data Combined.csv")
+### name of columns
+### From ==>  ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol', 'fasting blood sugar', 'resting ecg',
+###            'max heart rate', 'exercise angina', 'oldpeak', 'ST slope', 'target']
+### Into ==>  ['age', 'sex', 'cpt', 'rbps', 'chol', 'fbs', 'recg','mhr', 'exan', 'oldpk', 'ST', 'tgt']
+csv_data.columns = ['age', 'sex', 'cpt', 'rbps', 'chol', 'fbs', 'recg','mhr', 'exan', 'oldpk', 'ST', 'tgt']
+
+#################################  START OF CLEANING: REMOVING NULLS or MISSING VALUES   ###############################
+from sklearn.neighbors import KNeighborsRegressor
+'''Creating data for < resting bp s >'''
+X_rbps = csv_data[csv_data['rbps'] != 0] # All features where rbps != 0
+X_rbps_train = X_rbps.drop(['rbps', 'chol'], axis=1) # Missign values of both can affect the predictions
+y_rbps_train = csv_data['rbps'][csv_data['rbps'] != 0]
+
+X_rbps = csv_data[csv_data['rbps'] == 0]
+X_rbps_test = X_rbps.drop(['rbps', 'chol'], axis=1)
+y_rbps_test = csv_data['rbps'][csv_data['rbps'] == 0]
+
+'''Creating data for < cholestrol >'''
+X_chol = csv_data[csv_data['chol'] != 0] # All features where chol != 0
+X_chol_train = X_chol.drop(['rbps', 'chol'], axis=1) # Missign values of both can affect the predictions
+y_chol_train = csv_data['chol'][csv_data['chol'] != 0]
+
+X_chol = csv_data[csv_data['chol'] == 0]
+X_chol_test = X_chol.drop(['rbps', 'chol'], axis=1)
+y_chol_test = csv_data['chol'][csv_data['chol'] == 0]
+
+'''prediction of missing values['resting bp s']'''
+imputation_model = KNeighborsRegressor(n_neighbors=6, weights='distance')
+imputation_model.fit(X_rbps_train, y_rbps_train)
+y_rbps_test = imputation_model.predict(X_rbps_test)
+csv_data.at[csv_data['rbps'] == 0, 'rbps'] = y_rbps_test
+
+'''prediction of missing values['chlosterol']'''
+imputation_model.fit(X_chol_train, y_chol_train)
+y_chol_test = imputation_model.predict(X_chol_test)
+#csv_data['chol'][csv_data['chol'] == 0]. (y_chol_test)
+csv_data.at[csv_data['chol'] == 0 , 'chol'] = y_chol_test
+
+csv_data.to_csv('..\\Data\\Data 01\\Data Without Missing.csv')
+##################################################### END OF CLEANING ##################################################
+
+#################################################### STANDARDIZATION ###################################################
+'''Creating Standardizatio Model'''
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, MinMaxScaler
+from sklearn.compose import ColumnTransformer
+
+cat_values = ['sex', 'cpt', 'fbs', 'recg', 'exan', 'ST']
+num_values = ['age', 'rbps', 'chol', 'mhr','oldpk']
+features_after_scaling = ['age','rbps','chol','mhr','oldpk','sex 0','sex 1','cpt 0','cpt 1','cpt 2','cpt 3',
+                          'fbs 0','fbs 1','recg 0','recg 1','recg 2','exan 0','exan 1','ST 0','ST 1','ST 2','ST 3']
+cat_values_onehotted = ['sex 0','sex 1','cpt 0','cpt 1','cpt 2','cpt 3',
+                          'fbs 0','fbs 1','recg 0','recg 1','recg 2','exan 0','exan 1','ST 0','ST 1','ST 2','ST 3']
+
+data_for_scale = csv_data
+
+data_scale_transform = ColumnTransformer([
+    ("num", StandardScaler(), num_values),
+    ("cat", OneHotEncoder(), cat_values)
+])
+standardized_data = data_scale_transform.fit_transform(data_for_scale)
+standardized_data = pd.DataFrame(standardized_data, columns=features_after_scaling)
+
+standardized_data['tgt'] = csv_data['tgt']
+standardized_data[cat_values_onehotted] = standardized_data[cat_values_onehotted].astype('int64')
+#standardized_data['index'] = standardized_data
+standardized_data.to_csv('..\\Data\\Data 01\\Data Standardized.csv')
+############################################## END OF STANDARDIZATION ##################################################
+
